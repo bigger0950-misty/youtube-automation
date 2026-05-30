@@ -167,7 +167,8 @@ type SettingsHugo struct {
 type SettingsAI struct {
 	Provider  string              `yaml:"provider"`
 	Azure     SettingsAzureAI     `yaml:"azure"`
-	Anthropic SettingsAnthropicAI `yaml:"anthropic"`
+		Anthropic SettingsAnthropicAI `yaml:"anthropic"`
+	Gemini    SettingsGeminiAI    `yaml:"gemini"`
 }
 
 type SettingsAzureAI struct {
@@ -178,6 +179,11 @@ type SettingsAzureAI struct {
 }
 
 type SettingsAnthropicAI struct {
+	Key   string `yaml:"key"`
+	Model string `yaml:"model"`
+}
+
+type SettingsGeminiAI struct {
 	Key   string `yaml:"key"`
 	Model string `yaml:"model"`
 }
