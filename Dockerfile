@@ -16,7 +16,7 @@ COPY . .
 # Copy built frontend into the embed directory
 COPY --from=frontend-build /app/web/dist ./internal/frontend/dist
 ARG VERSION=dev
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-X main.version=${VERSION}" -o youtube-release ./cmd/youtube-automation
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -ldflags="-X main.version=${VERSION}" -o youtube-release ./cmd/youtube-automation
 
 # Stage 3: Minimal runtime
 FROM alpine:3.21
