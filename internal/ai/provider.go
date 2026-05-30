@@ -9,6 +9,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/llms/googleai"
 	"github.com/tmc/langchaingo/llms/openai"
 
 	"devopstoolkit/youtube-automation/internal/configuration"
@@ -30,6 +31,12 @@ type AnthropicProvider struct {
 	model  string
 }
 
+// GeminiProvider implements AIProvider for Google Gemini
+type GeminiProvider struct {
+	client llms.Model
+	model  string
+}
+
 // GetAIProvider creates the appropriate AI provider based on configuration
 var GetAIProvider = func() (AIProvider, error) {
 	switch configuration.GlobalSettings.AI.Provider {
@@ -37,6 +44,8 @@ var GetAIProvider = func() (AIProvider, error) {
 		return createAzureProvider()
 	case "anthropic":
 		return createAnthropicProvider()
+	case "gemini":
+		return createGeminiProvider()
 	default:
 		return nil, fmt.Errorf("unsupported AI provider: %s", configuration.GlobalSettings.AI.Provider)
 	}
@@ -44,8 +53,7 @@ var GetAIProvider = func() (AIProvider, error) {
 
 func createAzureProvider() (*AzureProvider, error) {
 	config := configuration.GlobalSettings.AI.Azure
-	
-	// Get API key from environment or config
+
 	apiKey := os.Getenv("AI_KEY")
 	if apiKey == "" && config.Key != "" {
 		apiKey = config.Key
@@ -53,19 +61,14 @@ func createAzureProvider() (*AzureProvider, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("Azure OpenAI API key not configured")
 	}
-
 	if config.Endpoint == "" || config.Deployment == "" {
 		return nil, fmt.Errorf("Azure OpenAI endpoint or deployment not configured")
 	}
-
-	// Default API version if not set
 	apiVersion := config.APIVersion
 	if apiVersion == "" {
 		apiVersion = "2023-05-15"
 	}
-
 	baseURL := strings.TrimSuffix(config.Endpoint, "/")
-
 	llm, err := openai.New(
 		openai.WithToken(apiKey),
 		openai.WithBaseURL(baseURL),
@@ -76,14 +79,12 @@ func createAzureProvider() (*AzureProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Azure OpenAI client: %w", err)
 	}
-
 	return &AzureProvider{client: llm}, nil
 }
 
 func createAnthropicProvider() (*AnthropicProvider, error) {
 	config := configuration.GlobalSettings.AI.Anthropic
-	
-	// Get API key from environment or config
+
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" && config.Key != "" {
 		apiKey = config.Key
@@ -91,18 +92,41 @@ func createAnthropicProvider() (*AnthropicProvider, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("Anthropic API key not configured")
 	}
-
 	model := config.Model
 	if model == "" {
 		model = "claude-sonnet-4-20250514"
 	}
-
-	client := anthropic.NewClient(
-		option.WithAPIKey(apiKey),
-	)
-
+	client := anthropic.NewClient(option.WithAPIKey(apiKey))
 	return &AnthropicProvider{
 		client: client,
+		model:  model,
+	}, nil
+}
+
+func createGeminiProvider() (*GeminiProvider, error) {
+	config := configuration.GlobalSettings.AI.Gemini
+
+	apiKey := os.Getenv("GOOGLE_API_KEY")
+	if apiKey == "" && config.Key != "" {
+		apiKey = config.Key
+	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("Google API key not configured: set GOOGLE_API_KEY env var")
+	}
+	model := config.Model
+	if model == "" {
+		model = "gemini-2.5-flash"
+	}
+	llm, err := googleai.New(
+		context.Background(),
+		googleai.WithAPIKey(apiKey),
+		googleai.WithDefaultModel(model),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+	}
+	return &GeminiProvider{
+		client: llm,
 		model:  model,
 	}, nil
 }
@@ -119,7 +143,6 @@ func (a *AzureProvider) GenerateContent(ctx context.Context, prompt string, maxT
 	if err != nil {
 		return "", fmt.Errorf("Azure OpenAI generation failed: %w", err)
 	}
-	
 	return strings.TrimSpace(completion), nil
 }
 
@@ -135,15 +158,26 @@ func (a *AnthropicProvider) GenerateContent(ctx context.Context, prompt string, 
 	if err != nil {
 		return "", fmt.Errorf("Anthropic generation failed: %w", err)
 	}
-
 	if len(message.Content) == 0 {
 		return "", fmt.Errorf("Anthropic returned empty response")
 	}
-
-	// Extract text from the first content block
-	if len(message.Content) > 0 && message.Content[0].Text != "" {
+	if message.Content[0].Text != "" {
 		return strings.TrimSpace(message.Content[0].Text), nil
 	}
-
 	return "", fmt.Errorf("Anthropic response contains no text content")
+}
+
+// GenerateContent for Gemini
+func (g *GeminiProvider) GenerateContent(ctx context.Context, prompt string, maxTokens int) (string, error) {
+	completion, err := llms.GenerateFromSinglePrompt(
+		ctx,
+		g.client,
+		prompt,
+		llms.WithTemperature(0.7),
+		llms.WithMaxTokens(maxTokens),
+	)
+	if err != nil {
+		return "", fmt.Errorf("Gemini generation failed: %w", err)
+	}
+	return strings.TrimSpace(completion), nil
 }
