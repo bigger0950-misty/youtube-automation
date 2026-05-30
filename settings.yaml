@@ -7,7 +7,7 @@ email:
   editTo: viktor@farcic.com
   financeTo: devopstoolkit@acme.com
 ai:
-  provider: anthropic  # Options: azure, anthropic
+    provider: gemini  # Options: azure, anthropic, gemini
   azure:
     endpoint: https://dotaisweden.openai.azure.com
     deployment: gpt-4-1106-preview
@@ -15,6 +15,9 @@ ai:
   anthropic:
     model: claude-sonnet-4-5-20250929  # Latest Claude Sonnet 4.5 model
     # key: set via ANTHROPIC_API_KEY environment variable
+      gemini:
+    model: gemini-2.5-flash
+    # key: set via GOOGLE_API_KEY environment variable
 hugo:
   path: ../devopstoolkit-live/
 youtube:
